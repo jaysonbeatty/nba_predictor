@@ -1,0 +1,81 @@
+name: Refresh NBA data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 20 * * *'
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Refresh games
+        run: |
+          PYTHONPATH=src python -m nba_prediction.ingest.fetch_games_nba_api \
+            --seasons 2023-24 2024-25 2025-26 \
+            --season-type regular
+
+      - name: Rebuild team features
+        run: PYTHONPATH=src python -m nba_prediction.pipeline.run_step1 --drop-incomplete
+
+      - name: Refresh player logs
+        run: |
+          PYTHONPATH=src python -m nba_prediction.ingest.fetch_player_games_nba_api \
+            --seasons 2023-24 2024-25 2025-26 \
+            --season-type regular
+
+      - name: Rebuild player and injury features
+        run: |
+          PYTHONPATH=src python -m nba_prediction.features.build_player_impact_features
+          PYTHONPATH=src python -m nba_prediction.features.build_historical_availability_proxy
+          PYTHONPATH=src python -m nba_prediction.features.build_injury_features \
+            --injuries-input data/processed/historical_injury_status_proxy.csv \
+            --output data/processed/team_injury_features_historical.csv
+          PYTHONPATH=src python -m nba_prediction.features.merge_game_injury_features \
+            --injuries-input data/processed/team_injury_features_historical.csv \
+            --output data/processed/games_model_with_historical_injuries.csv
+
+      - name: Retrain models
+        run: |
+          PYTHONPATH=src python -m nba_prediction.models.train_baseline \
+            --input data/processed/games_model_with_historical_injuries.csv \
+            --metrics-output artifacts/metrics/baseline_with_historical_injuries_metrics.json \
+            --model-name baseline_with_historical_injuries
+
+      - name: Commit refreshed artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/raw/games_raw.csv \
+            data/raw/player_game_stats.csv \
+            data/processed/games_model_base.csv \
+            data/processed/team_games_enriched.csv \
+            data/processed/player_impact_features.csv \
+            data/processed/historical_injury_status_proxy.csv \
+            data/processed/team_injury_features_historical.csv \
+            data/processed/games_model_with_historical_injuries.csv \
+            artifacts/models/baseline_with_historical_injuries_win_model.joblib \
+            artifacts/models/baseline_with_historical_injuries_margin_model.joblib \
+            artifacts/models/baseline_with_historical_injuries_total_model.joblib \
+            artifacts/metrics/baseline_with_historical_injuries_metrics.json
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+            exit 0
+          fi
+          git commit -m "Automated data refresh"
+          git push

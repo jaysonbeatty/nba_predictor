@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NBA Prediction Chat</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3" />
+    <link rel="stylesheet" href="/static/styles.css?v=4" />
   </head>
   <body>
     <main class="page">
@@ -12,8 +12,8 @@
         <p class="eyebrow">NBA Prediction Portfolio</p>
         <h1>NBA Prediction Chat</h1>
         <p class="hero-copy">
-          Ask natural what-if questions about a selected NBA game. The chat uses a scenario-aware
-          prediction engine underneath, then explains the change like an analyst.
+          Ask natural what-if questions about tonight's NBA games. The chat sits on top of a
+          scenario-aware prediction engine and explains the impact like an analyst.
         </p>
       </section>
 
@@ -55,6 +55,7 @@
               <div>
                 <p class="section-label">Tonight's Slate</p>
                 <h2 id="gamesTitle">Loading games</h2>
+                <p id="gamesMeta" class="panel-meta">Checking tonight's schedule and latest saved model snapshot.</p>
               </div>
             </div>
             <div id="gamesList" class="games-list"></div>
@@ -64,8 +65,13 @@
 
           <section id="resultsSection" class="results hidden">
             <div class="panel result-panel">
-              <p class="section-label">Current Snapshot</p>
-              <h2 id="baselineTitle">Baseline Prediction</h2>
+              <div class="result-head">
+                <div>
+                  <p class="section-label">Current Snapshot</p>
+                  <h2 id="baselineTitle">Baseline Prediction</h2>
+                </div>
+                <p id="resultsMeta" class="panel-meta">Pregame probabilities built from historical team and player features.</p>
+              </div>
               <div id="baselineCards" class="card-grid"></div>
             </div>
 
@@ -86,6 +92,6 @@
       </section>
     </main>
 
-    <script src="/static/app.js?v=3" type="module"></script>
+    <script src="/static/app.js?v=4" type="module"></script>
   </body>
 </html>

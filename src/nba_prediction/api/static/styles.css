@@ -8,6 +8,7 @@
   --accent-dark: #7d2817;
   --accent-soft: rgba(194, 74, 44, 0.12);
   --success: #245c45;
+  --success-soft: rgba(36, 92, 69, 0.12);
   --shadow: 0 24px 56px rgba(52, 35, 18, 0.12);
   --radius: 24px;
 }
@@ -37,7 +38,9 @@ body {
 }
 
 .eyebrow,
-.section-label {
+.section-label,
+.scenario-kicker,
+.assistant-kicker {
   margin: 0 0 10px;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -84,6 +87,13 @@ body {
   backdrop-filter: blur(12px);
 }
 
+.panel-meta {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
 .chat-panel {
   min-height: 780px;
   display: grid;
@@ -93,7 +103,9 @@ body {
 
 .chat-header,
 .controls-header,
-.chat-actions {
+.chat-actions,
+.result-head,
+.scenario-card-head {
   display: flex;
   gap: 16px;
   align-items: center;
@@ -134,11 +146,6 @@ body {
 .button.primary {
   background: var(--accent);
   color: #fff8f1;
-}
-
-.button.secondary {
-  background: rgba(194, 74, 44, 0.1);
-  color: var(--accent-dark);
 }
 
 .chat-thread {
@@ -199,13 +206,6 @@ body {
   font-size: 0.93rem;
 }
 
-.field-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: 1fr;
-  margin-top: 18px;
-}
-
 .field {
   display: flex;
   flex-direction: column;
@@ -236,7 +236,7 @@ body {
 .status {
   padding: 14px 18px;
   border-radius: 18px;
-  background: rgba(36, 92, 69, 0.12);
+  background: var(--success-soft);
   color: var(--success);
 }
 
@@ -244,28 +244,67 @@ body {
   display: none;
 }
 
-.results {
-  display: grid;
-  gap: 18px;
-}
-
+.games-list,
+.results,
 .card-grid,
 .scenario-results {
   display: grid;
   gap: 14px;
 }
 
-.card-grid {
+.games-list {
+  margin-top: 16px;
+}
+
+.game-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(76, 54, 29, 0.08);
+  font-size: 0.98rem;
+}
+
+.team-code {
+  letter-spacing: 0.08em;
+}
+
+.at-separator {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.empty-games {
+  margin: 0;
+  color: var(--muted);
+}
+
+.card-grid,
+.scenario-grid {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.card-grid {
   margin-top: 18px;
 }
 
 .metric-card,
 .scenario-result-card {
-  border-radius: 18px;
-  padding: 18px;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(62, 46, 26, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(76, 54, 29, 0.08);
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.metric-card.home {
+  background: rgba(36, 92, 69, 0.08);
+}
+
+.metric-card.away {
+  background: rgba(194, 74, 44, 0.08);
 }
 
 .metric-card h3,
@@ -274,31 +313,73 @@ body {
   margin: 0 0 10px;
 }
 
+.metric-value {
+  display: block;
+  font-size: 1.85rem;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
 .metric-card p,
-.scenario-result-card p {
-  margin: 0 0 8px;
+.scenario-result-card p,
+.resolved-list,
+.delta-label,
+.scenario-win-shift-label {
+  margin: 0;
   color: var(--muted);
 }
 
-.metric-value {
+.scenario-result-card {
+  display: grid;
+  gap: 16px;
+}
+
+.scenario-card-head {
+  align-items: flex-start;
+}
+
+.scenario-win-shift {
+  min-width: 132px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  text-align: right;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(76, 54, 29, 0.08);
+}
+
+.scenario-win-shift.up {
+  background: rgba(36, 92, 69, 0.1);
+}
+
+.scenario-win-shift.down {
+  background: rgba(194, 74, 44, 0.1);
+}
+
+.scenario-win-shift strong {
   display: block;
-  margin-top: 8px;
-  font-size: 1.45rem;
-  font-weight: 700;
-  color: var(--accent-dark);
+  margin-top: 6px;
+  font-size: 1.2rem;
+  color: var(--text);
+}
+
+.delta-strip {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(243, 236, 223, 0.9);
+}
+
+.delta-strip strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.08rem;
+  color: var(--text);
 }
 
 .resolved-list {
-  margin-top: 12px;
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-
-.how-it-works ul {
-  margin: 14px 0 0;
-  padding-left: 18px;
-  line-height: 1.7;
-  color: var(--muted);
+  line-height: 1.5;
 }
 
 .sr-only {
@@ -309,32 +390,43 @@ body {
   margin: -1px;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
   border: 0;
 }
 
-@media (max-width: 1040px) {
+@media (max-width: 1024px) {
   .workspace {
     grid-template-columns: 1fr;
   }
 
   .chat-panel {
-    min-height: auto;
+    min-height: 640px;
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 720px) {
   .page {
-    padding-inline: 14px;
+    padding: 20px 14px 44px;
   }
 
   .chat-header,
   .controls-header,
-  .chat-actions {
+  .chat-actions,
+  .result-head,
+  .scenario-card-head {
     flex-direction: column;
     align-items: flex-start;
   }
 
   .starter-pills {
     justify-content: flex-start;
+  }
+
+  .chat-message {
+    max-width: 100%;
+  }
+
+  .delta-strip {
+    grid-template-columns: 1fr;
   }
 }

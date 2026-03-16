@@ -3,6 +3,7 @@ const resultsSection = document.querySelector("#resultsSection");
 const baselineCards = document.querySelector("#baselineCards");
 const scenarioResults = document.querySelector("#scenarioResults");
 const baselineTitle = document.querySelector("#baselineTitle");
+const resultsMeta = document.querySelector("#resultsMeta");
 const statusBanner = document.querySelector("#statusBanner");
 const chatThread = document.querySelector("#chatThread");
 const chatForm = document.querySelector("#chatForm");
@@ -11,6 +12,7 @@ const sendBtn = document.querySelector("#sendBtn");
 const starterPills = [...document.querySelectorAll(".pill")];
 const gamesList = document.querySelector("#gamesList");
 const gamesTitle = document.querySelector("#gamesTitle");
+const gamesMeta = document.querySelector("#gamesMeta");
 
 let todaysGames = [];
 
@@ -55,8 +57,20 @@ function todayLocalIso() {
   return `${year}-${month}-${day}`;
 }
 
+function formatDisplayDate(value) {
+  const parsed = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 function normalizeText(text) {
-  return text.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+  return (text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function titleCaseName(name) {
@@ -65,6 +79,15 @@ function titleCaseName(name) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function showStatus(message, isError = false) {
@@ -97,19 +120,26 @@ function formatGameLabel(game) {
 
 function renderGamesList() {
   gamesTitle.textContent = todaysGames.length
-    ? `${todaysGames.length} game${todaysGames.length === 1 ? "" : "s"} on ${gameDateInput.value}`
-    : `No games on ${gameDateInput.value}`;
+    ? `${todaysGames.length} game${todaysGames.length === 1 ? "" : "s"} on ${formatDisplayDate(gameDateInput.value)}`
+    : `No games on ${formatDisplayDate(gameDateInput.value)}`;
 
   gamesList.innerHTML = "";
   if (!todaysGames.length) {
-    gamesList.innerHTML = `<p class="empty-games">No games available for ${gameDateInput.value}.</p>`;
+    gamesMeta.textContent = "No scheduled matchups were returned for tonight's date.";
+    gamesList.innerHTML = `<p class="empty-games">No games available for ${formatDisplayDate(gameDateInput.value)}.</p>`;
     return;
   }
+
+  gamesMeta.textContent = `Tonight's schedule is live. Predictions use the latest saved model snapshot and pregame team history through ${formatDisplayDate(gameDateInput.value)}.`;
 
   todaysGames.forEach((game) => {
     const card = document.createElement("article");
     card.className = "game-chip";
-    card.innerHTML = `<strong>${game.away_team}</strong><span>at</span><strong>${game.home_team}</strong>`;
+    card.innerHTML = `
+      <strong class="team-code">${escapeHtml(game.away_team)}</strong>
+      <span class="at-separator">at</span>
+      <strong class="team-code">${escapeHtml(game.home_team)}</strong>
+    `;
     gamesList.appendChild(card);
   });
 }
@@ -121,15 +151,15 @@ async function loadGames() {
   todaysGames = data.games || [];
   renderGamesList();
   if (todaysGames.length) {
-    showStatus(`Loaded ${todaysGames.length} game${todaysGames.length === 1 ? "" : "s"} for ${gameDateInput.value}.`);
+    showStatus(`Loaded ${todaysGames.length} game${todaysGames.length === 1 ? "" : "s"} for ${formatDisplayDate(gameDateInput.value)}.`);
   } else {
-    showStatus(`No games found for ${gameDateInput.value}.`, true);
+    showStatus(`No games found for ${formatDisplayDate(gameDateInput.value)}.`, true);
   }
 }
 
-function renderMetricCard(label, value, caption) {
+function renderMetricCard(label, value, caption, tone = "neutral") {
   return `
-    <article class="metric-card">
+    <article class="metric-card ${tone}">
       <h3>${label}</h3>
       <span class="metric-value">${value}</span>
       <p>${caption}</p>
@@ -139,43 +169,74 @@ function renderMetricCard(label, value, caption) {
 
 function renderBaseline(result) {
   baselineTitle.textContent = `${result.game.away_team} at ${result.game.home_team}`;
+  resultsMeta.textContent = `Pregame forecast for ${formatDisplayDate(result.game.date)}. Scheduled games use each team's latest prior form and rest profile.`;
   const baseline = result.baseline_prediction;
   baselineCards.innerHTML = [
-    renderMetricCard("Home Win Probability", `${(baseline.home_win_prob * 100).toFixed(1)}%`, result.game.home_team),
-    renderMetricCard("Away Win Probability", `${(baseline.away_win_prob * 100).toFixed(1)}%`, result.game.away_team),
+    renderMetricCard("Home Win Probability", `${(baseline.home_win_prob * 100).toFixed(1)}%`, result.game.home_team, "home"),
+    renderMetricCard("Away Win Probability", `${(baseline.away_win_prob * 100).toFixed(1)}%`, result.game.away_team, "away"),
     renderMetricCard("Projected Margin", `${baseline.predicted_margin.toFixed(2)}`, `${result.game.home_team} minus ${result.game.away_team}`),
     renderMetricCard("Projected Total", `${baseline.predicted_total.toFixed(2)}`, "Combined points"),
   ].join("");
 }
 
-function renderScenarioCard(scenario) {
+function formatDeltaValue(value, suffix = "") {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}${suffix}`;
+}
+
+function renderScenarioCard(scenario, game) {
   const prediction = scenario.scenario_prediction;
   const delta = scenario.delta;
   const resolved = scenario.resolved_overrides || [];
-  const resolvedText = resolved.length
+  const assumptionText = resolved.length
     ? resolved
-        .map((item) => `${item.player_name} (${item.resolved_team}) - ${item.status}${item.minutes_limit ? ` ${item.minutes_limit} min` : ""}`)
-        .join(", ")
+        .map((item) => `${item.player_name} (${item.resolved_team}) ${item.status}${item.minutes_limit ? `, ${item.minutes_limit} min limit` : ""}`)
+        .join("; ")
     : "No overrides applied.";
 
   return `
     <article class="scenario-result-card">
-      <h3>${scenario.name}</h3>
-      <p>Home win probability: <strong>${(prediction.home_win_prob * 100).toFixed(1)}%</strong></p>
-      <p>Projected margin: <strong>${prediction.predicted_margin.toFixed(2)}</strong></p>
-      <p>Projected total: <strong>${prediction.predicted_total.toFixed(2)}</strong></p>
-      <h4>Delta vs baseline</h4>
-      <p>Win probability change: <strong>${(delta.home_win_prob_change * 100).toFixed(1)} pts</strong></p>
-      <p>Margin change: <strong>${delta.predicted_margin_change.toFixed(2)}</strong></p>
-      <p>Total change: <strong>${delta.predicted_total_change.toFixed(2)}</strong></p>
-      <div class="resolved-list"><strong>Resolved overrides:</strong> ${resolvedText}</div>
+      <div class="scenario-card-head">
+        <div>
+          <p class="scenario-kicker">Scenario</p>
+          <h3>${escapeHtml(scenario.name)}</h3>
+        </div>
+        <div class="scenario-win-shift ${delta.away_win_prob_change >= 0 ? "up" : "down"}">
+          <span class="scenario-win-shift-label">Away win change</span>
+          <strong>${formatDeltaValue(delta.away_win_prob_change * 100, " pts")}</strong>
+        </div>
+      </div>
+
+      <div class="scenario-grid">
+        ${renderMetricCard("Scenario Home Win", `${(prediction.home_win_prob * 100).toFixed(1)}%`, game.home_team, "home")}
+        ${renderMetricCard("Scenario Away Win", `${(prediction.away_win_prob * 100).toFixed(1)}%`, game.away_team, "away")}
+        ${renderMetricCard("Scenario Margin", `${prediction.predicted_margin.toFixed(2)}`, `${game.home_team} minus ${game.away_team}`)}
+        ${renderMetricCard("Scenario Total", `${prediction.predicted_total.toFixed(2)}`, "Combined points")}
+      </div>
+
+      <div class="delta-strip">
+        <div>
+          <span class="delta-label">Win probability</span>
+          <strong>${formatDeltaValue(delta.away_win_prob_change * 100, " pts")}</strong>
+        </div>
+        <div>
+          <span class="delta-label">Margin</span>
+          <strong>${formatDeltaValue(delta.predicted_margin_change)}</strong>
+        </div>
+        <div>
+          <span class="delta-label">Total</span>
+          <strong>${formatDeltaValue(delta.predicted_total_change)}</strong>
+        </div>
+      </div>
+
+      <div class="resolved-list"><strong>Resolved assumptions:</strong> ${escapeHtml(assumptionText)}</div>
     </article>
   `;
 }
 
 function renderResults(data) {
   renderBaseline(data);
-  scenarioResults.innerHTML = data.scenarios.map(renderScenarioCard).join("");
+  scenarioResults.innerHTML = data.scenarios.map((scenario) => renderScenarioCard(scenario, data.game)).join("");
   resultsSection.classList.remove("hidden");
 }
 
@@ -321,9 +382,9 @@ async function runBaselineForGame(game) {
 function formatOutlookReply(data) {
   const baseline = data.baseline_prediction;
   return `
-    <p><strong>${data.game.away_team} at ${data.game.home_team}</strong></p>
-    <p>${data.game.home_team} win probability: <strong>${(baseline.home_win_prob * 100).toFixed(1)}%</strong>. ${data.game.away_team} win probability: <strong>${(baseline.away_win_prob * 100).toFixed(1)}%</strong>.</p>
-    <p>Projected score: <strong>${baseline.expected_home_score}-${baseline.expected_away_score}</strong>, with a projected margin of <strong>${baseline.predicted_margin.toFixed(2)}</strong> and total of <strong>${baseline.predicted_total.toFixed(2)}</strong>.</p>
+    <p class="assistant-kicker">Forecast for ${data.game.away_team} at ${data.game.home_team}</p>
+    <p><strong>${data.game.away_team}</strong> win probability: <strong>${(baseline.away_win_prob * 100).toFixed(1)}%</strong>. <strong>${data.game.home_team}</strong> win probability: <strong>${(baseline.home_win_prob * 100).toFixed(1)}%</strong>.</p>
+    <p>Projected score: <strong>${baseline.expected_away_score}-${baseline.expected_home_score}</strong> from the away-team perspective, with a projected margin of <strong>${baseline.predicted_margin.toFixed(2)}</strong> and total of <strong>${baseline.predicted_total.toFixed(2)}</strong>.</p>
   `;
 }
 
@@ -343,8 +404,8 @@ function formatAssistantReply(data) {
 
   return `
     ${assumption}
-    <p><strong>Baseline:</strong> ${data.game.away_team} ${Math.round(baseline.away_win_prob * 100)}%, projected score ${baseline.expected_home_score}-${baseline.expected_away_score}.</p>
-    <p><strong>Scenario:</strong> ${data.game.away_team} ${Math.round(scenario.away_win_prob * 100)}%, projected score ${scenario.expected_home_score}-${scenario.expected_away_score}.</p>
+    <p><strong>Baseline:</strong> ${data.game.away_team} ${Math.round(baseline.away_win_prob * 100)}%, projected score ${baseline.expected_away_score}-${baseline.expected_home_score}.</p>
+    <p><strong>Scenario:</strong> ${data.game.away_team} ${Math.round(scenario.away_win_prob * 100)}%, projected score ${scenario.expected_away_score}-${scenario.expected_home_score}.</p>
     <p><strong>Change:</strong> ${data.game.away_team} win probability ${delta.away_win_prob_change >= 0 ? "+" : ""}${(delta.away_win_prob_change * 100).toFixed(1)} pts, margin ${delta.predicted_margin_change >= 0 ? "+" : ""}${delta.predicted_margin_change.toFixed(2)}, total ${delta.predicted_total_change >= 0 ? "+" : ""}${delta.predicted_total_change.toFixed(2)}.</p>
   `;
 }
@@ -422,7 +483,7 @@ async function onSubmit(event) {
   const prompt = chatInput.value.trim();
   if (!prompt) return;
 
-  addChatMessage("user", `<p>${prompt}</p>`);
+  addChatMessage("user", `<p>${escapeHtml(prompt)}</p>`);
   chatInput.value = "";
   setSendingState(true);
   try {
