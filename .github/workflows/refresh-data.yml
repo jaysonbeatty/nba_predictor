@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '15 20 * * *'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -21,26 +24,41 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Show environment
+        run: |
+          set -euxo pipefail
+          python --version
+          pip --version
+          pwd
+          ls
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          set -euxo pipefail
+          pip install -r requirements.txt
 
       - name: Refresh games
         run: |
+          set -euxo pipefail
           PYTHONPATH=src python -m nba_prediction.ingest.fetch_games_nba_api \
             --seasons 2023-24 2024-25 2025-26 \
             --season-type regular
 
       - name: Rebuild team features
-        run: PYTHONPATH=src python -m nba_prediction.pipeline.run_step1 --drop-incomplete
+        run: |
+          set -euxo pipefail
+          PYTHONPATH=src python -m nba_prediction.pipeline.run_step1 --drop-incomplete
 
       - name: Refresh player logs
         run: |
+          set -euxo pipefail
           PYTHONPATH=src python -m nba_prediction.ingest.fetch_player_games_nba_api \
             --seasons 2023-24 2024-25 2025-26 \
             --season-type regular
 
       - name: Rebuild player and injury features
         run: |
+          set -euxo pipefail
           PYTHONPATH=src python -m nba_prediction.features.build_player_impact_features
           PYTHONPATH=src python -m nba_prediction.features.build_historical_availability_proxy
           PYTHONPATH=src python -m nba_prediction.features.build_injury_features \
@@ -52,6 +70,7 @@ jobs:
 
       - name: Retrain models
         run: |
+          set -euxo pipefail
           PYTHONPATH=src python -m nba_prediction.models.train_baseline \
             --input data/processed/games_model_with_historical_injuries.csv \
             --metrics-output artifacts/metrics/baseline_with_historical_injuries_metrics.json \
@@ -59,6 +78,7 @@ jobs:
 
       - name: Commit refreshed artifacts
         run: |
+          set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/raw/games_raw.csv \
