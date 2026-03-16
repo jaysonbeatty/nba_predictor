@@ -245,6 +245,10 @@ function parseMinutesLimit(text) {
   return match ? Number(match[1]) : null;
 }
 
+function hasScenarioSignal(text) {
+  return /\bout\b|\blimited\b|\bavailable\b|\bback\b|\breturns?\b/i.test(text);
+}
+
 function splitScenarioParts(text) {
   const compareMatch = text.match(/compare\s+(.+)/i);
   if (!compareMatch) return null;
@@ -296,6 +300,7 @@ function chooseBestPlayerMatch(matches) {
 }
 
 function buildSingleScenarioFromPrompt(prompt) {
+  if (!hasScenarioSignal(prompt)) return null;
   const playerName = inferPlayerName(prompt);
   if (!playerName) return null;
   const status = inferStatus(prompt);
@@ -362,7 +367,11 @@ async function inferGameFromPrompt(prompt) {
 }
 
 function isOutlookPrompt(prompt) {
-  return /\boutlook\b|\bwho wins\b|\bforecast\b|\bchance\b|\bprobability\b/i.test(prompt) && !/\bout\b|\blimited\b|\bcompare\b/i.test(prompt);
+  return (
+    /\boutlook\b|\bwho wins\b|\bforecast\b|\bchance\b|\bprobability\b|\bwill\s+.+\s+win\b/i.test(prompt) &&
+    !hasScenarioSignal(prompt) &&
+    !/\bcompare\b/i.test(prompt)
+  );
 }
 
 async function runBaselineForGame(game) {
